@@ -40,7 +40,7 @@ fig.update_layout(
 app.layout = html.Div(className='container', children=[
     # Header
     html.Div([
-        html.H1("Mapbox Map Centered on Taiwan with Historical Weather Data"),
+        html.H1("Weather App"),
     ], style={'margin-top': '10px'}),  # Adjust top margin as needed
     
     # Location info
@@ -102,6 +102,9 @@ def get_historical_weather(lat, lon, days=7):
                 historical_data.append({'date': date, 'temperature': temperature})
     except Exception as e:
         print(f"Error fetching historical weather: {e}")
+    
+    # Sort data from oldest to newest
+    historical_data.sort(key=lambda x: x['date'])
     return historical_data
 
 # Function to fetch weather data from WeatherAPI
@@ -159,7 +162,7 @@ def update_map_and_weather(n_clicks, location_name):
                         lon=lon
                     ),
                     pitch=0,
-                    zoom=7,  # Adjust zoom level as needed
+                    zoom=12,  # Adjust zoom level as needed
                     style='streets'
                 ),
                 width=1000,
@@ -169,17 +172,14 @@ def update_map_and_weather(n_clicks, location_name):
             # Fetch the weather for the new marker's location
             temperature = get_weather(lat, lon)
             if temperature is not None:
-                # location_info = (f"Location '{location_name}' added at Longitude = {lon}, Latitude = {lat}. "
-                #                  f"Current temperature: {temperature}°C")
                 location_info = (f"Current temperature: {temperature}°C")
-            # else:
-            #     location_info = f"Location '{location_name}' added at Longitude = {lon}, Latitude = {lat}. Weather data not found."
             
             # Fetch historical weather data
             historical_data = get_historical_weather(lat, lon)
             df = pd.DataFrame(historical_data)
             line_chart = go.Figure()
             if not df.empty:
+                df['date'] = pd.to_datetime(df['date']).dt.strftime('%m-%d')  # Format date to 'day-month'
                 line_chart.add_trace(go.Scatter(
                     x=df['date'],
                     y=df['temperature'],
@@ -190,7 +190,7 @@ def update_map_and_weather(n_clicks, location_name):
                     title=f'Historical Weather Data for {location_name}',
                     xaxis_title='Date',
                     yaxis_title='Temperature (°C)',
-                    xaxis=dict(type='category')
+                    xaxis=dict(type='category', tickangle=-45)  # Rotate x-axis labels for better readability
                 )
             else:
                 line_chart.update_layout(title='No historical data available')
@@ -217,7 +217,7 @@ def update_map_and_weather(n_clicks, location_name):
             height=450
         )
         
-        location_info = "Enter a location and click 'Query' to show the weather data and location on the map"
+        location_info = "Enter a location and click 'Query'"
         line_chart = go.Figure()  # Empty chart
     
     return fig, line_chart, location_info
