@@ -3,11 +3,14 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import plotly.graph_objects as go
+from dotenv import load_dotenv
 import os
 import requests
 
-# Fetch Mapbox access token from environment variable
-mapbox_access_token = 'pk.eyJ1Ijoiam95Y2UtZTE4MDczMyIsImEiOiJjbHlzZjJnZTIwaGt4MnNxNnpiMzR6bnkxIn0.ELyxtLMbaOw-f9MeEj_kZA'
+# Fetch Mapbox and Weather API access tokens from environment variables
+load_dotenv()
+mapbox_access_token = os.getenv('MAPBOX_ACCESS_TOKEN')
+weather_api_key = os.getenv('WEATHER_API_KEY')
 
 # Coordinates for three initial markers in Taiwan
 marker_coords = [
@@ -51,18 +54,27 @@ fig.update_layout(
         style='streets'
     ),
     width=1000,
-    height=900
+    height=800
 )
 
 # Define the layout of the app
 app.layout = html.Div([
-    html.H1("Mapbox Map Centered on Taiwan with Markers"),
-    dcc.Graph(id='map', figure=fig, style={'width': '1000px', 'height': '900px'}),
+    # Container for the form at the top
     html.Div([
-        dcc.Input(id='location-input', type='text', placeholder='Enter location name...'),
-        html.Button('Query', id='query-button', n_clicks=0),
-    ]),
-    html.Div(id='location-info')
+        html.H1("Map App"),
+        html.Div([
+            dcc.Input(id='location-input', type='text', placeholder='Enter location name...'),
+            html.Button('Query', id='query-button', n_clicks=0),
+        ], style={'margin-bottom': '20px'})
+    ], style={'text-align': 'center'}),
+    
+    # Container for displaying location information and temperature
+    html.Div(id='location-info'),
+    
+    # Container for the map
+    html.Div([
+        dcc.Graph(id='map', figure=fig, style={'width': '1000px', 'height': '800px'}),
+    ])
 ])
 
 # Function to fetch coordinates from Mapbox Geocoding API
@@ -79,7 +91,21 @@ def get_coordinates(location_name):
         return {'lon': coordinates[0], 'lat': coordinates[1]}
     return None
 
-# Callback to handle location queries and update the map
+# Function to fetch weather data from Weather API
+def get_weather(lat, lon):
+    weather_url = 'http://api.weatherapi.com/v1/current.json'
+    params = {
+        'key': weather_api_key,
+        'q': f'{lat},{lon}',  # Query parameter for latitude and longitude
+        'aqi': 'no'           # Optional parameter to exclude air quality information
+    }
+    response = requests.get(weather_url, params=params)
+    data = response.json()
+    if 'current' in data:
+        return data['current']['temp_c']  # Temperature in Celsius
+    return None
+
+# Callback to handle location queries, update the map, and fetch weather
 @app.callback(
     [Output('map', 'figure'),
      Output('location-info', 'children')],
@@ -115,14 +141,20 @@ def update_map(n_clicks, location_name):
                         lon=lon
                     ),
                     pitch=0,
-                    zoom=7,  # Adjust zoom level as needed
+                    zoom=12,  # Adjust zoom level as needed
                     style='streets'
                 ),
                 width=1000,
-                height=900
+                height=800
             )
             
-            location_info = f"Location '{location_name}' added at Longitude = {lon}, Latitude = {lat}"
+            # Fetch the weather for the new marker's location
+            temperature = get_weather(lat, lon)
+            if temperature is not None:
+                location_info = (f"Location '{location_name}' added at Longitude = {lon}, Latitude = {lat}. "
+                                 f"Current temperature: {temperature}°C")
+            else:
+                location_info = f"Location '{location_name}' added at Longitude = {lon}, Latitude = {lat}. Weather data not found."
         else:
             location_info = f"Location '{location_name}' not found."
     else:
@@ -150,7 +182,7 @@ def update_map(n_clicks, location_name):
                 style='streets'
             ),
             width=1000,
-            height=900
+            height=800
         )
         
         location_info = "Enter a location and click 'Query' to add a marker."
